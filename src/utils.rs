@@ -24,6 +24,27 @@ pub(crate) fn extract_digits(s:&str) -> (&str, &str) {
     take_while(|c| c.is_ascii_digit(), s)
 }
 
+pub(crate) fn extract_ident(s:&str) -> (&str, &str) {
+    let input_starts_with_alphabet = s
+        .chars()
+        .next()
+        .map(|ch| ch.is_ascii_alphabetic())
+        .unwrap_or(false);
+    if input_starts_with_alphabet {
+        take_while(|ch| ch.is_ascii_alphanumeric(), s)
+    } else {
+        (s, "")
+    }
+}
+
+pub(crate) fn tag<'a, 'b>(starting_text: &'a str, s: &'b str) -> &'b str {
+    if s.starts_with(starting_text) {
+        &s[starting_text.len()..]
+    } else {
+        panic!("Expected {}", starting_text);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -71,6 +92,26 @@ mod tests {
     #[test]
     fn extract_spaces() {
         assert_eq!(extract_whitespaces("  4"), ("4", "  "));
+    }
+
+    #[test]
+    fn extract_alphabetic_ident() {
+        assert_eq!(extract_ident("asdfasdfWEfzsdf let"), (" let", "asdfasdfWEfzsdf"));
+    }
+
+    #[test]
+    fn extract_alphanumeric_ident() {
+        assert_eq!(extract_ident("var1()"), ("()", "var1"));
+    }
+
+    #[test]
+    fn cannot_extract_ident_beginning_with_number() {
+        assert_eq!(extract_ident("123abc"), ("123abc", ""));
+    }
+
+    #[test]
+    fn tag_word() {
+        assert_eq!(tag("let", "let a"), " a");
     }
 }
 
