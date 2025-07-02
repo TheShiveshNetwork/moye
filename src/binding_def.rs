@@ -8,8 +8,8 @@ use crate::env::Env;
 
 #[derive(Debug, PartialEq)]
 pub struct BindingDef {
-    name: String,
-    value: Expression,
+    pub name: String,
+    pub value: Expression,
 }
 
 impl BindingDef {
