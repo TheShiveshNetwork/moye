@@ -1,5 +1,10 @@
+pub mod block;
+pub mod binding_usage;
+
 use crate::utils;
 use crate::val::Val;
+use binding_usage::BindingUsage;
+use block::Block;
 
 #[derive(Debug, PartialEq)]
 pub struct Number(pub i32);
@@ -33,12 +38,18 @@ impl Operations {
 pub enum Expression {
     Number(Number),
     Operation { lhs: Number, rhs: Number, op: Operations },
+    BindingUsage(BindingUsage),
+    Block(Block),
 }
 
 impl Expression {
     pub fn new(s:&str) -> Result<(&str, Self), String> {
-        Self::new_operation(s).
-            or_else(|_| Self::new_number(s))
+        Self::new_operation(s)
+            .or_else(|_| Self::new_number(s))
+            .or_else(|_| {
+                BindingUsage::new(s).map(|(s, binding_usage)| (s, Self::BindingUsage(binding_usage)))
+            })
+            .or_else(|_| Block::new(s).map(|(s, block)| (s, Self::Block(block))))
     }
 
     fn new_operation(s:&str) -> Result<(&str, Self), String> {
@@ -68,6 +79,7 @@ impl Expression {
                 };
                 Val::Number(res)
             }
+            _ => todo!(),
         }
     }
 }
@@ -75,6 +87,7 @@ impl Expression {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::statements::Statement;
 
     #[test]
     fn parse_number() {
@@ -181,6 +194,32 @@ mod tests {
                 op: Operations::Div,
             }.eval(),
             Val::Number(10),
+        );
+    }
+
+    #[test]
+    fn parse_binding_usafe() {
+        assert_eq!(
+            Expression::new("bar"),
+            Ok((
+                "",
+                Expression::BindingUsage(BindingUsage {
+                    name: "bar".to_string(),
+                }),
+            )),
+        );
+    }
+
+    #[test]
+    fn parse_block() {
+        assert_eq!(
+            Expression::new("{ 200 }"),
+            Ok((
+                "",
+                Expression::Block(Block {
+                    stmts: vec![Statement::Expression(Expression::Number(Number(200)))],
+                }),
+            )),
         );
     }
 }

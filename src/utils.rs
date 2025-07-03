@@ -25,12 +25,14 @@ pub(crate) fn take_while_with_error(accept: impl Fn(char) -> bool, s:&str, error
     }
 }
 
+const WHITESPACE: &[char] = &[' ', '\n'];
+
 pub(crate) fn extract_whitespaces(s:&str) -> (&str, &str) {
-    take_while(|c| c == ' ', s)
+    take_while(|c| WHITESPACE.contains(&c), s)
 }
 
 pub(crate) fn extract_whitespaces_with_error(s:&str) -> Result<(&str, &str), String> {
-    take_while_with_error(|c| c == ' ', s, "expected a space".to_string())
+    take_while_with_error(|c| WHITESPACE.contains(&c), s, "expected a space".to_string())
 }
 
 pub(crate) fn extract_digits(s:&str) -> Result<(&str, &str), String> {
@@ -75,6 +77,11 @@ mod tests {
     #[test]
     fn do_not_extract_digits_when_input_is_invalid() {
         assert_eq!(extract_digits("abcd"), Err("expected digits".to_string()))
+    }
+
+    #[test]
+    fn extract_newlines_or_spaces() {
+        assert_eq!(extract_whitespaces(" \n     \n\nabc"), ("abc", " \n     \n\n"));
     }
 
     #[test]
