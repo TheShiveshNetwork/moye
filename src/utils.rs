@@ -1,12 +1,4 @@
-pub(crate) fn extract_operator(s:&str) -> (&str, &str) {
-    match &s[0..1] {
-        "+" | "-" | "*" | "/" => {},
-        _ => panic!("Bad Operator: Not implemented yet"),
-    }
-    (&s[1..], &s[0..1])
-}
-
-pub(crate) fn take_while(accept: impl Fn(char) -> bool, s:&str) -> (&str, &str) {
+fn take_while(accept: impl Fn(char) -> bool, s:&str) -> (&str, &str) {
     let extracted_end = s
         .char_indices()
         .find_map(|(idx, ch)| if accept(ch) { None } else { Some(idx) })
@@ -16,7 +8,7 @@ pub(crate) fn take_while(accept: impl Fn(char) -> bool, s:&str) -> (&str, &str) 
     (remainder, extracted)
 }
 
-pub(crate) fn take_while_with_error(accept: impl Fn(char) -> bool, s:&str, error_msg: String) -> Result<(&str, &str), String> {
+fn take_while_with_error(accept: impl Fn(char) -> bool, s:&str, error_msg: String) -> Result<(&str, &str), String> {
     let (remainder, extracted) = take_while(accept, s);
     if extracted.is_empty() {
         Err(error_msg)

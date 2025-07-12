@@ -7,13 +7,13 @@ use crate::utils;
 use crate::env::Env;
 
 #[derive(Debug, PartialEq)]
-pub struct BindingDef {
-    pub name: String,
-    pub value: Expression,
+pub(crate) struct BindingDef {
+    pub(crate) name: String,
+    pub(crate) value: Expression,
 }
 
 impl BindingDef {
-    pub fn new(s:&str) -> Result<(&str, Self), String> {
+    pub(crate) fn new(s:&str) -> Result<(&str, Self), String> {
         let s = utils::tag("let", s)?;
         let (s, _) = utils::extract_whitespaces_with_error(s)?;
         let (s, name) = utils::extract_ident(s)?;
