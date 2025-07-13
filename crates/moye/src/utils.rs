@@ -52,6 +52,20 @@ pub(crate) fn tag<'a, 'b>(starting_text: &'a str, s: &'b str) -> Result<&'b str,
     }
 }
 
+pub(crate) fn sequence<T>(
+    parser: impl Fn(&str) -> Result<(&str, T), String>,
+    mut s: &str,
+) -> Result<(&str, Vec<T>), String> {
+    let mut items = Vec::new();
+    while let Ok((new_s, item)) = parser(s) {
+        s = new_s;
+        items.push(item);
+        let (new_s, _) = extract_whitespaces(s);
+        s = new_s;
+    }
+    Ok((s, items))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -84,26 +98,6 @@ mod tests {
     #[test]
     fn extract_digits_with_no_remainder() {
         assert_eq!(extract_digits("100"), Ok(("", "100")))
-    }
-
-    #[test]
-    fn extract_plus() {
-        assert_eq!(extract_operator("+2"), ("2", "+"))
-    }
-
-    #[test]
-    fn extract_minus() {
-        assert_eq!(extract_operator("-10"), ("10", "-"))
-    }
-
-    #[test]
-    fn extract_star() {
-        assert_eq!(extract_operator("*3"), ("3", "*"))
-    }
-
-    #[test]
-    fn extract_slash() {
-        assert_eq!(extract_operator("/4"), ("4", "/"))
     }
 
     #[test]

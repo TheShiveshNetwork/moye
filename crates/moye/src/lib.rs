@@ -2,6 +2,7 @@ mod val;
 mod expr;
 mod binding_def;
 mod statements;
+mod func_def;
 
 mod env;
 mod utils;
