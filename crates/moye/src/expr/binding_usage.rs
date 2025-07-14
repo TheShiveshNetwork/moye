@@ -1,10 +1,11 @@
 use crate::utils;
 use crate::env::Env;
 use crate::val::Val;
+use crate::expr::FuncCall;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct BindingUsage {
-    pub(super) name: String,
+    pub(crate) name: String,
 }
 
 impl BindingUsage {
@@ -19,7 +20,18 @@ impl BindingUsage {
     }
 
     pub(super) fn eval(&self, env: &Env) -> Result<Val, String> {
-        env.get_binding_value(&self.name)
+        env.get_binding(&self.name)
+            .or_else(|error_msg| {
+                if env.get_func(&self.name).is_ok() {
+                    FuncCall {
+                        callee: self.name.clone(),
+                        params: Vec::new(),
+                    }.eval(env)
+                } else {
+                    Err(error_msg)
+                }
+            }
+        )
     }
 }
 

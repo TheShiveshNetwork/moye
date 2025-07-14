@@ -3,9 +3,9 @@ use crate::statements::Statement;
 use crate::env::Env;
 use crate::val::Val;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Block {
-    pub(super) stmts: Vec<Statement>,
+    pub(crate) stmts: Vec<Statement>,
 }
 
 impl Block {
@@ -13,16 +13,7 @@ impl Block {
         let s = utils::tag("{", s)?;
         let (s, _) = utils::extract_whitespaces(s);
 
-        let mut s = dbg!(s);
-        let mut stmts = Vec::new();
-
-        while let Ok((new_s, stmt)) = Statement::new(s) {
-            s = dbg!(new_s);
-            stmts.push(stmt);
-            let (new_s, _) = utils::extract_whitespaces(s);
-            s = new_s;
-            dbg!(s);
-        }
+        let (s, stmts) = utils::sequence(Statement::new, utils::extract_whitespaces, s)?;
 
         let (s, _) = utils::extract_whitespaces(s);
         let s = utils::tag("}", s)?;
@@ -183,8 +174,8 @@ mod tests {
                     Statement::Expression(Expression::Number(Number(100))),
                     Statement::Expression(Expression::Number(Number(30))),
                     Statement::Expression(Expression::Operation {
-                        lhs: Number(10),
-                        rhs: Number(7),
+                        lhs: Box::new(Expression::Number(Number(10))),
+                        rhs: Box::new(Expression::Number(Number(7))),
                         op: Operations::Sub,
                     }),
                 ],

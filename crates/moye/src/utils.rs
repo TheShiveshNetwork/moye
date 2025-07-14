@@ -1,4 +1,4 @@
-fn take_while(accept: impl Fn(char) -> bool, s:&str) -> (&str, &str) {
+pub(crate) fn take_while(accept: impl Fn(char) -> bool, s:&str) -> (&str, &str) {
     let extracted_end = s
         .char_indices()
         .find_map(|(idx, ch)| if accept(ch) { None } else { Some(idx) })
@@ -52,6 +52,34 @@ pub(crate) fn tag<'a, 'b>(starting_text: &'a str, s: &'b str) -> Result<&'b str,
     }
 }
 
+pub(crate) fn sequence<T>(
+    parser: impl Fn(&str) -> Result<(&str, T), String>,
+    separator_parser: impl Fn(&str) -> (&str, &str),
+    mut s: &str,
+) -> Result<(&str, Vec<T>), String> {
+    let mut items = Vec::new();
+    while let Ok((new_s, item)) = parser(s) {
+        s = new_s;
+        items.push(item);
+        let (new_s, _) = separator_parser(s);
+        s = new_s;
+    }
+    Ok((s, items))
+}
+
+pub(crate) fn non_empty_sequence<T>(
+    parser: impl Fn(&str) -> Result<(&str, T), String>,
+    separator_parser: impl Fn(&str) -> (&str, &str),
+    s: &str,
+) -> Result<(&str, Vec<T>), String> {
+    let (s, sequence) = sequence(parser, separator_parser, s)?;
+    if sequence.is_empty() {
+        Err("expected a sequence with more than one item".to_string())
+    } else {
+        Ok((s, sequence))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -84,26 +112,6 @@ mod tests {
     #[test]
     fn extract_digits_with_no_remainder() {
         assert_eq!(extract_digits("100"), Ok(("", "100")))
-    }
-
-    #[test]
-    fn extract_plus() {
-        assert_eq!(extract_operator("+2"), ("2", "+"))
-    }
-
-    #[test]
-    fn extract_minus() {
-        assert_eq!(extract_operator("-10"), ("10", "-"))
-    }
-
-    #[test]
-    fn extract_star() {
-        assert_eq!(extract_operator("*3"), ("3", "*"))
-    }
-
-    #[test]
-    fn extract_slash() {
-        assert_eq!(extract_operator("/4"), ("4", "/"))
     }
 
     #[test]

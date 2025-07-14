@@ -1,13 +1,16 @@
 mod block;
 mod binding_usage;
+mod func_call;
+
+pub(crate) use binding_usage::BindingUsage;
+pub(crate) use block::Block;
+pub(crate) use func_call::FuncCall;
 
 use crate::env::Env;
 use crate::utils;
 use crate::val::Val;
-use binding_usage::BindingUsage;
-use block::Block;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Number(pub i32);
 
 impl Number {
@@ -17,7 +20,7 @@ impl Number {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Operations {
     Add,
     Sub,
@@ -35,31 +38,41 @@ impl Operations {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Expression {
     Number(Number),
-    Operation { lhs: Number, rhs: Number, op: Operations },
+    Operation { lhs: Box<Self>, rhs: Box<Self>, op: Operations },
+    FuncCall(FuncCall),
     BindingUsage(BindingUsage),
     Block(Block),
 }
 
 impl Expression {
     pub(crate) fn new(s:&str) -> Result<(&str, Self), String> {
-        Self::new_operation(s)
-            .or_else(|_| Self::new_number(s))
+        Self::new_operation(s).or_else(|_| Self::new_non_operation(s))
+    }
+
+    fn new_non_operation(s:&str) -> Result<(&str, Self), String> {
+        Self::new_number(s)
+            .or_else(|_| FuncCall::new(s).map(|(s, func_call)| (s, Self::FuncCall(func_call))))
             .or_else(|_| {
-                BindingUsage::new(s).map(|(s, binding_usage)| (s, Self::BindingUsage(binding_usage)))
+                BindingUsage::new(s)
+                    .map(|(s, binding_usage)| (s, Self::BindingUsage(binding_usage)))
             })
             .or_else(|_| Block::new(s).map(|(s, block)| (s, Self::Block(block))))
     }
 
     fn new_operation(s:&str) -> Result<(&str, Self), String> {
-        let (s, lhs) = Number::new(s)?;
+        let (s, lhs) = Self::new_non_operation(s)?;
         let (s, _) = utils::extract_whitespaces(s);
         let (s, op) = Operations::new(s)?;
         let (s, _) = utils::extract_whitespaces(s);
-        let (s, rhs) = Number::new(s)?;
-        Ok((s, Self::Operation { lhs, rhs, op }))
+        let (s, rhs) = Self::new_non_operation(s)?;
+        Ok((s, Self::Operation {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            op
+        }))
     }
 
     fn new_number(s:&str) -> Result<(&str, Self), String> {
@@ -70,16 +83,24 @@ impl Expression {
         match self {
             Self::Number(Number(n)) => Ok(Val::Number(*n)),
             Self::Operation { lhs, rhs, op } => {
-                let Number(lhs) = lhs;
-                let Number(rhs) = rhs;
+                let lhs = lhs.eval(env)?;
+                let rhs = rhs.eval(env)?;
+
+                let (lhs, rhs) = match (lhs, rhs) {
+                    (Val::Number(lhs), Val::Number(rhs)) => (lhs, rhs),
+                    _ => return Err("cannot evaluate operation whose left-hand side and right-hand side are not both numbers".to_string()),
+                };
+
                 let res = match op {
                     Operations::Add => lhs + rhs,
                     Operations::Sub => lhs - rhs,
                     Operations::Mul => lhs * rhs,
                     Operations::Div => lhs / rhs,
                 };
+
                 Ok(Val::Number(res))
             },
+            Self::FuncCall(func_call) => func_call.eval(env),
             Self::BindingUsage(binding_usage) => binding_usage.eval(env),
             Self::Block(block) => block.eval(env),
         }
@@ -128,8 +149,8 @@ mod tests {
             Ok((
                 "",
                 Expression::Operation {
-                    lhs: Number(1),
-                    rhs: Number(2),
+                    lhs: Box::new(Expression::Number(Number(1))),
+                    rhs: Box::new(Expression::Number(Number(2))),
                     op: Operations::Add,
                 }
             )),
@@ -143,8 +164,8 @@ mod tests {
             Ok((
                 "",
                 Expression::Operation {
-                    lhs: Number(1),
-                    rhs: Number(2),
+                    lhs: Box::new(Expression::Number(Number(1))),
+                    rhs: Box::new(Expression::Number(Number(2))),
                     op: Operations::Mul,
                 }
             )),
@@ -155,8 +176,8 @@ mod tests {
     fn eval_add() {
         assert_eq!(
             Expression::Operation {
-                lhs: Number(10),
-                rhs: Number(5),
+                lhs: Box::new(Expression::Number(Number(10))),
+                rhs: Box::new(Expression::Number(Number(5))),
                 op: Operations::Add,
             }.eval(&Env::default()),
             Ok(Val::Number(15)),
@@ -167,8 +188,8 @@ mod tests {
     fn eval_subtract() {
         assert_eq!(
             Expression::Operation {
-                lhs: Number(5),
-                rhs: Number(2),
+                lhs: Box::new(Expression::Number(Number(5))),
+                rhs: Box::new(Expression::Number(Number(2))),
                 op: Operations::Sub,
             }.eval(&Env::default()),
             Ok(Val::Number(3)),
@@ -179,8 +200,8 @@ mod tests {
     fn eval_multiply() {
         assert_eq!(
             Expression::Operation {
-                lhs: Number(2),
-                rhs: Number(3),
+                lhs: Box::new(Expression::Number(Number(2))),
+                rhs: Box::new(Expression::Number(Number(3))),
                 op: Operations::Mul,
             }.eval(&Env::default()),
             Ok(Val::Number(6)),
@@ -191,8 +212,8 @@ mod tests {
     fn eval_division() {
         assert_eq!(
             Expression::Operation {
-                lhs: Number(500),
-                rhs: Number(50),
+                lhs: Box::new(Expression::Number(Number(500))),
+                rhs: Box::new(Expression::Number(Number(50))),
                 op: Operations::Div,
             }.eval(&Env::default()),
             Ok(Val::Number(10)),
@@ -234,6 +255,61 @@ mod tests {
                 name: "ten".to_string(),
             }).eval(&env),
             Ok(Val::Number(10)),
+        );
+    }
+
+    #[test]
+    fn eval_non_number_operation() {
+        assert_eq!(
+            Expression::Operation {
+                lhs: Box::new(Expression::Number(Number(10))),
+                rhs: Box::new(Expression::Block(Block { stmts: Vec::new() })),
+                op: Operations::Add,
+            }
+            .eval(&Env::default()),
+            Err("cannot evaluate operation whose left-hand side and right-hand side are not both numbers".to_string()),
+        );
+    }
+
+    #[test]
+    fn parse_func_call() {
+        assert_eq!(
+            Expression::new("add 1 2"),
+            Ok((
+                "",
+                Expression::FuncCall(FuncCall {
+                    callee: "add".to_string(),
+                    params: vec![Expression::Number(Number(1)), Expression::Number(Number(2))],
+                }),
+            )),
+        );
+    }
+
+    #[test]
+    fn eval_func_call() {
+        let mut env = Env::default();
+
+        env.store_func(
+            "add".to_string(),
+            vec!["x".to_string(), "y".to_string()],
+            Statement::Expression(Expression::Operation {
+                lhs: Box::new(Expression::BindingUsage(BindingUsage {
+                    name: "x".to_string(),
+                })),
+                rhs: Box::new(Expression::BindingUsage(BindingUsage {
+                    name: "y".to_string(),
+                })),
+                op: Operations::Add,
+            }),
+        );
+
+        assert_eq!(
+            Expression::FuncCall(FuncCall {
+                callee: "add".to_string(),
+                params: vec![Expression::Number(Number(2)), Expression::Number(Number(2))],
+            })
+            .eval(&env),
+            Ok(Val::Number(4)),
         );
     }
 }
