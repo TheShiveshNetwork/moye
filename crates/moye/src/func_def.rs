@@ -20,6 +20,7 @@ impl FuncDef {
 
         let (s, params) = utils::sequence(
             |s| utils::extract_ident(s).map(|(s, ident)| (s, ident.to_string())),
+            utils::extract_whitespaces,
             s,
         )?;
 

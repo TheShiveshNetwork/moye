@@ -1,8 +1,10 @@
 mod block;
 mod binding_usage;
+mod func_call;
 
 pub(crate) use binding_usage::BindingUsage;
 pub(crate) use block::Block;
+pub(crate) use func_call::FuncCall;
 
 use crate::env::Env;
 use crate::utils;
@@ -40,6 +42,7 @@ impl Operations {
 pub(crate) enum Expression {
     Number(Number),
     Operation { lhs: Box<Self>, rhs: Box<Self>, op: Operations },
+    FuncCall(FuncCall),
     BindingUsage(BindingUsage),
     Block(Block),
 }
@@ -51,6 +54,7 @@ impl Expression {
 
     fn new_non_operation(s:&str) -> Result<(&str, Self), String> {
         Self::new_number(s)
+            .or_else(|_| FuncCall::new(s).map(|(s, func_call)| (s, Self::FuncCall(func_call))))
             .or_else(|_| {
                 BindingUsage::new(s)
                     .map(|(s, binding_usage)| (s, Self::BindingUsage(binding_usage)))
@@ -96,6 +100,7 @@ impl Expression {
 
                 Ok(Val::Number(res))
             },
+            Self::FuncCall(func_call) => func_call.eval(env),
             Self::BindingUsage(binding_usage) => binding_usage.eval(env),
             Self::Block(block) => block.eval(env),
         }
@@ -263,6 +268,48 @@ mod tests {
             }
             .eval(&Env::default()),
             Err("cannot evaluate operation whose left-hand side and right-hand side are not both numbers".to_string()),
+        );
+    }
+
+    #[test]
+    fn parse_func_call() {
+        assert_eq!(
+            Expression::new("add 1 2"),
+            Ok((
+                "",
+                Expression::FuncCall(FuncCall {
+                    callee: "add".to_string(),
+                    params: vec![Expression::Number(Number(1)), Expression::Number(Number(2))],
+                }),
+            )),
+        );
+    }
+
+    #[test]
+    fn eval_func_call() {
+        let mut env = Env::default();
+
+        env.store_func(
+            "add".to_string(),
+            vec!["x".to_string(), "y".to_string()],
+            Statement::Expression(Expression::Operation {
+                lhs: Box::new(Expression::BindingUsage(BindingUsage {
+                    name: "x".to_string(),
+                })),
+                rhs: Box::new(Expression::BindingUsage(BindingUsage {
+                    name: "y".to_string(),
+                })),
+                op: Operations::Add,
+            }),
+        );
+
+        assert_eq!(
+            Expression::FuncCall(FuncCall {
+                callee: "add".to_string(),
+                params: vec![Expression::Number(Number(2)), Expression::Number(Number(2))],
+            })
+            .eval(&env),
+            Ok(Val::Number(4)),
         );
     }
 }

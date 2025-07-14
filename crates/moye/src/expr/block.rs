@@ -13,7 +13,7 @@ impl Block {
         let s = utils::tag("{", s)?;
         let (s, _) = utils::extract_whitespaces(s);
 
-        let (s, stmts) = utils::sequence(Statement::new, s)?;
+        let (s, stmts) = utils::sequence(Statement::new, utils::extract_whitespaces, s)?;
 
         let (s, _) = utils::extract_whitespaces(s);
         let s = utils::tag("}", s)?;
